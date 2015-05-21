@@ -71,6 +71,7 @@ boolean torpedosArmed, torpedosFire1, torpedosFire2, torpedosReload1, torpedosRe
 boolean lasersArmed, lasersFire1, lasersFire2, lasersReload1, lasersReload2;
 
 // Targeting system variables
+boolean animateTarget = true;
 boolean targetAcquired = false;
 int targetPosition = random(targetingPixels.numPixels());
 int targetBrightness = 255;
@@ -133,8 +134,15 @@ byte shieldModBaseColor[] = {0,255,255};
 byte shieldFreqCurrentColor[] = {0,255,255};
 byte shieldModCurrentColor[] = {0,255,255};
 
+// Serial variables
+String inputString;
+int commandPayloadSize = 4;
+String commandType, commandID;
+int commandValue;
+
 void setup() {
-  Serial.begin(9600);
+  // Set up serial connection
+  Serial.begin(115200);
   
   // Set up targeting system =====================================
   pinMode(TARGETING_LEFT, INPUT);
@@ -249,9 +257,10 @@ void setup() {
 }
 
 void loop() {
-  // Update current millis and catch overflow
+  // Update current millis counter
   currentMillis = millis();
   
+  // Reset all subsystem counters when millis() overflows 
   if(currentMillis == 0) {
     targetingLastUpdate = 0;
     torpedoLastUpdate1 = 0;
@@ -266,6 +275,9 @@ void loop() {
   updateTorpedoSystem();
   updateLaserSystem();
   updateShieldSystem();
+  
+  // Process any serial information
+  processSerial();
 }
 
 /***************************************************************************
@@ -286,13 +298,15 @@ void updateTargetingSystem() {
       targetingPixels.setPixelColor(i, 0, 0, 0);
 
     // Move target
-    if(targetPosition != targetMoveTo) {
-      if(targetPosition - targetMoveTo > 0)
-        targetPosition--;
-      else
-        targetPosition++; 
-    } else {
-      targetMoveTo = random(targetingPixels.numPixels());
+    if(animateTarget) {
+      if(targetPosition != targetMoveTo) {
+        if(targetPosition - targetMoveTo > 0)
+          targetPosition--;
+        else
+          targetPosition++; 
+      } else {
+        targetMoveTo = random(targetingPixels.numPixels());
+      }
     }
  
     // Move crosshairs
@@ -339,6 +353,18 @@ void updateTargetingSystem() {
 //    Serial.println(targetingLock);
     /***************************************/
 }
+
+  int getTargetPosition()     {  return targetPosition;     }
+  int getCrosshairPosition()  {  return crosshairPosition;  }
+  boolean getTargetAcquired() {  return targetAcquired;     }
+  boolean getAnimateTarget()  {  return animateTarget;      }
+  int getCrosshairWidth()     {  return crosshairWidth;     }
+  
+  void setTargetPosition(int targetPosition_)       {  targetPosition = targetPosition_;        }
+  void setCrosshairPosition(int crosshairPosition_) {  crosshairPosition = crosshairPosition_;  }
+  void setTargetAcquired(boolean targetAcquired_)   {  targetAcquired = targetAcquired_;        }
+  void setAnimateTarget(boolean animateTarget_)     {  animateTarget = animateTarget_;          }
+  void setCrosshairWidth(int crosshairWidth_)       {  crosshairWidth = crosshairWidth_;        }
 
 /***************************************************************************
  Update torpedo system
@@ -425,23 +451,31 @@ void updateTorpedoSystem() {
 
 void fireTorpedo(byte torpedo) {
   if(torpedo == 1) {
-    Serial.println("Fired torpedo 1");
+//    Serial.println("Fired torpedo 1");
     torpedosLoaded1 = false;
   } else if(torpedo == 2) {
-    Serial.println("Fired torpedo 2");
+//    Serial.println("Fired torpedo 2");
     torpedosLoaded2 = false;
   }
 }
 
 void reloadTorpedo(byte torpedo) {
   if(torpedo == 1) {
-    Serial.println("Reloaded torpedo 1");
+//    Serial.println("Reloaded torpedo 1");
     torpedosLoaded1 = true;
   } else if(torpedo == 2) {
-    Serial.println("Reloaded torpedo 2");
+//    Serial.println("Reloaded torpedo 2");
     torpedosLoaded2 = true;
   }
 }
+
+  boolean getTorpedosArmed()   {  return torpedosArmed;    }
+  boolean getTorpedosLoaded1() {  return torpedosLoaded1;  }
+  boolean getTorpedosLoaded2() {  return torpedosLoaded2;  }
+  
+  void setTorpedosArmed(boolean torpedosArmed_)     {  torpedosArmed = torpedosArmed_;      }
+  void setTorpedosLoaded1(boolean torpedosLoaded1_) {  torpedosLoaded1 = torpedosLoaded1_;  }
+  void setTorpedosLoaded2(boolean torpedosLoaded2_) {  torpedosLoaded2 = torpedosLoaded2_;  }
 
 /***************************************************************************
  Update laser system
@@ -553,13 +587,21 @@ void updateLaserSystem() {
 
 void fireLaser(byte laser) {
   if(laser == 1) {
-    Serial.println("Fired laser 1");
+//    Serial.println("Fired laser 1");
     lasersCharged1 = false;
   } else if(laser == 2) {
-    Serial.println("Fired laser 2");
+//    Serial.println("Fired laser 2");
     lasersCharged2 = false;
   }
 }
+
+  boolean getLasersArmed()   {  return lasersArmed;     }
+  boolean getLaserCharged1() {  return lasersCharged1;  }
+  boolean getLaserCharged2() {  return lasersCharged2;  }
+  
+  void setLasersArmed(boolean lasersArmed_)       {  lasersArmed = lasersArmed_;        }
+  void setLasersCharged1(boolean lasersCharged1_) {  lasersCharged1 = lasersCharged1_;  }
+  void setLasersCharged2(boolean lasersCharged2_) {  lasersCharged2 = lasersCharged2_;  }
 
 /***************************************************************************
  Update shield system
@@ -630,22 +672,40 @@ void updateShieldSystem() {
   }
 }
 
-void setShieldTopHealth(byte health)    {  shieldTopHealth = health;     }
-void setShieldLeftHealth(byte health)   {  shieldLeftHealth = health;    }
-void setShieldBottomHealth(byte health) {  shieldBottomHealth = health;  }
-void setShieldRightHealth(byte health)  {  shieldRightHealth = health;   }
+  int getShieldHealthTop()    {  return shieldTopHealth;      }
+  int getShieldHealthRight()  {  return  shieldRightHealth;   }
+  int getShieldHealthBottom() {  return  shieldBottomHealth;  }
+  int getShieldHealthLeft()   {  return shieldLeftHealth;     }
 
-void setFrequencyColor(byte r, byte g, byte b) {
-  shieldFreqBaseColor[0] = r;
-  shieldFreqBaseColor[1] = g;
-  shieldFreqBaseColor[2] = b;
-}
-
-void setModulationColor(byte r, byte g, byte b) {
-  shieldModBaseColor[0] = r;
-  shieldModBaseColor[1] = g;
-  shieldModBaseColor[2] = b;
-}
+  int getFrequency()  {  return freqPosition;  }
+  int getModulation() {  return modPosition;   }
+  
+  void setShieldHealth(byte top, byte right, byte bottom, byte left) {
+    setShieldHealthTop(top);
+    setShieldHealthRight(right);
+    setShieldHealthBottom(bottom);
+    setShieldHealthLeft(left);
+  }
+  
+  void setShieldHealthTop(byte health)    {  shieldTopHealth = health;     }
+  void setShieldHealthRight(byte health)  {  shieldRightHealth = health;   }
+  void setShieldHealthBottom(byte health) {  shieldBottomHealth = health;  }
+  void setShieldHealthLeft(byte health)   {  shieldLeftHealth = health;    }
+  
+  void setFrequency(int frequency)   {  freqPosition = frequency;  updateLEDRings();  }
+  void setModulation(int modulation) {  modPosition = modulation;  updateLEDRings();  }
+  
+  void setFrequencyColor(byte r, byte g, byte b) {
+    shieldFreqBaseColor[0] = r;
+    shieldFreqBaseColor[1] = g;
+    shieldFreqBaseColor[2] = b;
+  }
+  
+  void setModulationColor(byte r, byte g, byte b) {
+    shieldModBaseColor[0] = r;
+    shieldModBaseColor[1] = g;
+    shieldModBaseColor[2] = b;
+  }  
 
 /***************************************************************************
  Retreieve and process new rotary encoder values
@@ -742,6 +802,125 @@ void shiftOut16(uint16_t data) {
   shiftOut(SHIELDS_DAT, SHIELDS_CLK, MSBFIRST, datalsb);
 }
 
+// Map float value from one range to another
 float fmap(float x, float in_min, float in_max, float out_min, float out_max) {
  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+/*************************************************************************
+ Process all incoming serial data and execute commands given
+**************************************************************************/
+void processSerial() {
+  if(Serial.available() > 0) {
+    // Get entire string
+    inputString = Serial.readStringUntil('\n');
+
+    // Verify string length
+    if( inputString.length() >= commandPayloadSize ) {
+        commandType = inputString[0];            // Get type [G|S]
+        commandID = inputString.substring(1,4);  // Get ID
+        
+        // Getters
+        if(commandType == 'G') {
+          if(commandID == "TAP")
+            Serial.println( getTargetPosition() );
+          else if(commandID == "ATD")
+            Serial.println( getAnimateTarget() );            
+          else if(commandID == "CHP")
+            Serial.println( getCrosshairPosition() );
+          else if(commandID == "CHW")
+            Serial.println( getCrosshairWidth() );
+          else if(commandID == "TAA")
+            Serial.println( getTargetAcquired() );
+            
+          else if(commandID == "TOA")
+            Serial.println( getTorpedosArmed() );
+          else if(commandID == "TL1")
+            Serial.println( getTorpedosLoaded1() );
+          else if(commandID == "TL2")
+            Serial.println( getTorpedosLoaded2() );
+            
+          else if(commandID == "LAA")
+            Serial.println( getLasersArmed() );
+          else if(commandID == "LC1")
+            Serial.println( getLaserCharged1() );
+          else if(commandID == "LC2")
+            Serial.println( getLaserCharged2() );
+            
+          else if(commandID == "SHT")
+            Serial.println( getShieldHealthTop() );
+          else if(commandID == "SHR")
+            Serial.println( getShieldHealthRight() );
+          else if(commandID == "SHB")
+            Serial.println( getShieldHealthBottom() );
+          else if(commandID == "SHL")
+            Serial.println( getShieldHealthLeft() );
+            
+          else if(commandID == "SFR")
+            Serial.println( getFrequency() );
+          else if(commandID == "SMO")
+            Serial.println( getModulation() );
+            
+          else
+            Serial.println("Command ID not recognized");
+            
+        // Setters
+        } else if(commandType == 'S') {
+          // Get all numbers at end of command and convert to int
+          commandValue = inputString.substring(4).toInt();
+          
+          if(commandID == "TAP")
+            setTargetPosition( commandValue );
+          else if(commandID == "ATD")
+            setAnimateTarget( commandValue );
+          else if(commandID == "CHP")
+            setCrosshairPosition( commandValue );
+          else if(commandID == "CHW")
+            setCrosshairWidth( commandValue );
+          else if(commandID == "TAA")
+            setTargetAcquired( commandValue );
+        
+          else if(commandID == "TOA")
+            setTorpedosArmed( commandValue );
+          else if(commandID == "TL1")
+            setTorpedosLoaded1( commandValue );
+          else if(commandID == "TL2")
+            setTorpedosLoaded2( commandValue );
+            
+          else if(commandID == "LAA")
+            setLasersArmed( commandValue );
+          else if(commandID == "LC1")
+            setLasersCharged1( commandValue );
+          else if(commandID == "LC2")
+            setLasersCharged2( commandValue );
+            
+          else if(commandID == "SHT")
+            setShieldHealthTop( commandValue );
+          else if(commandID == "SHR")
+            setShieldHealthRight( commandValue );
+          else if(commandID == "SHB")
+            setShieldHealthBottom( commandValue );
+          else if(commandID == "SHL")
+            setShieldHealthLeft( commandValue );
+            
+          else if(commandID == "SFR")
+            setFrequency( commandValue );
+          else if(commandID == "SMO")
+            setModulation( commandValue );
+            
+          else
+            Serial.println("Command ID not recognized");
+          
+        // Unrecognized command
+        } else {
+          Serial.print("Command type not recognized: ");
+          Serial.println(commandType);          
+        }
+        
+    // Command not long enough
+    } else {
+      Serial.print("Command not long enough: ");
+      Serial.println(inputString);
+    }
+  }
 }
